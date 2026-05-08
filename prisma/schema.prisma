@@ -1,0 +1,570 @@
+// This is your CRM schema with batch-level profitability tracking
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ CORE ENTITIES ============
+
+model Business {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  displayName       String
+  businessType      String    // 'b2b', 'b2c', 'mixed'
+  taxId             String?
+  waveBusinessId    String?
+  address           Json?     // {street, city, state, zip, country}
+  phone             String?
+  email             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  profiles          Profile[]
+  userAccess        UserBusinessAccess[]
+  inventory         Inventory[]
+  inventoryBatches  InventoryBatch[]
+  orders            Order[]
+  purchaseOrders    PurchaseOrder[]
+  customers         Customer[]
+  vendors           Vendor[]
+  expenses          Expense[]
+  receipts          Receipt[]
+
+  @@index([name])
+}
+
+model Profile {
+  id                String    @id
+  businessId        String
+  fullName          String
+  role              String    // 'admin', 'employee', 'vendor', 'customer'
+  phone             String?
+  avatarUrl         String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessAccess    UserBusinessAccess[]
+  ordersCreated     Order[]   @relation("createdBy")
+  poCreated         PurchaseOrder[] @relation("createdBy")
+  expensesSubmitted Expense[] @relation("submittedBy")
+
+  @@unique([id, businessId])
+  @@index([businessId, role])
+}
+
+model UserBusinessAccess {
+  id                String    @id @default(cuid())
+  userId            String
+  businessId        String
+  roleOverride      String?   // Override profile role for this business
+  grantedAt         DateTime  @default(now())
+  grantedBy         String?
+
+  // Relations
+  user              Profile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, businessId])
+  @@index([businessId])
+}
+
+// ============ INVENTORY & PRODUCTS ============
+
+model ProductCategory {
+  id                String    @id @default(cuid())
+  name              String
+  parentId          String?
+  description       String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  parent            ProductCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children          ProductCategory[] @relation("CategoryHierarchy")
+  products          Product[]
+
+  @@index([parentId])
+}
+
+model Product {
+  id                String    @id @default(cuid())
+  sku               String    @unique
+  name              String
+  description       String?
+  categoryId        String?
+  unitOfMeasure     String    // 'lb', 'kg', 'each', 'case', 'dozen'
+  barcode           String?
+  imageUrl          String?
+  isPerishable      Boolean   @default(false)
+  minStockLevel     Decimal   @db.Decimal(10, 2) @default(0)
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  category          ProductCategory? @relation(fields: [categoryId], references: [id])
+  inventory         Inventory[]
+  inventoryBatches  InventoryBatch[]
+  productBatches    ProductBatch[]
+  orderItems        OrderItem[]
+  poItems           PurchaseOrderItem[]
+  vendorPrices      VendorPriceList[]
+
+  @@index([categoryId, sku])
+}
+
+model ProductBatch {
+  id                String    @id @default(cuid())
+  productId         String
+  batchNumber       String    // Supplier lot number
+  supplierId        String?
+  receivedDate      DateTime
+  expirationDate    DateTime?
+  quantityReceived  Decimal   @db.Decimal(10, 2)
+  unitCostAtReceipt Decimal   @db.Decimal(10, 4)
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier          Vendor?   @relation(fields: [supplierId], references: [id])
+  inventoryBatches  InventoryBatch[]
+  orderItems        OrderItem[]
+
+  @@unique([productId, batchNumber])
+  @@index([productId, expirationDate])
+}
+
+model Inventory {
+  id                String    @id @default(cuid())
+  productId         String
+  businessId        String
+  quantityOnHand    Decimal   @db.Decimal(10, 2) @default(0)
+  quantityReserved  Decimal   @db.Decimal(10, 2) @default(0)
+  costPerUnit       Decimal   @db.Decimal(10, 4)  // Weighted average
+  retailPrice       Decimal   @db.Decimal(10, 2)
+  wholesalePrice    Decimal   @db.Decimal(10, 2)?
+  lastRestockedAt   DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  transactions      InventoryTransaction[]
+
+  @@unique([productId, businessId])
+  @@index([businessId, quantityOnHand])
+}
+
+model InventoryBatch {
+  id                String    @id @default(cuid())
+  productId         String
+  businessId        String
+  batchId           String
+  quantityAvailable Decimal   @db.Decimal(10, 2)
+  costPerUnitAtReceipt Decimal @db.Decimal(10, 4)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  batch             ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, businessId, batchId])
+  @@index([businessId, batchId])
+}
+
+model InventoryTransaction {
+  id                String    @id @default(cuid())
+  productId         String
+  businessId        String
+  batchId           String?
+  transactionType   String    // 'purchase', 'sale', 'transfer_in', 'transfer_out', 'adjustment', 'return'
+  quantity          Decimal   @db.Decimal(10, 2)
+  unitCost          Decimal   @db.Decimal(10, 4)?
+  referenceId       String?   // FK to PO, Order, or Transfer
+  referenceType     String?   // 'purchase_order', 'order', 'transfer'
+  notes             String?
+  performedBy       String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventory         Inventory @relation(fields: [productId, businessId], references: [productId, businessId], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
+  @@index([referenceId, referenceType])
+}
+
+model InventoryTransfer {
+  id                String    @id @default(cuid())
+  fromBusinessId    String
+  toBusinessId      String
+  productId         String
+  quantity          Decimal   @db.Decimal(10, 2)
+  transferCost      Decimal   @db.Decimal(10, 2) @default(0)
+  status            String    @default("pending") // 'pending', 'in_transit', 'completed', 'cancelled'
+  requestedBy       String?
+  approvedBy        String?
+  notes             String?
+  transferredAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ============ PURCHASING ============
+
+model PurchaseOrder {
+  id                String    @id @default(cuid())
+  businessId        String
+  vendorId          String
+  poNumber          String    @unique
+  status            String    @default("draft") // 'draft', 'sent', 'received', 'partial', 'cancelled'
+  orderDate         DateTime  @default(now())
+  expectedDate      DateTime?
+  receivedDate      DateTime?
+  subtotal          Decimal   @db.Decimal(12, 2) @default(0)
+  taxAmount         Decimal   @db.Decimal(12, 2) @default(0)
+  shippingAmount    Decimal   @db.Decimal(12, 2) @default(0)
+  totalAmount       Decimal   @db.Decimal(12, 2) @default(0)
+  paymentStatus     String    @default("unpaid") // 'unpaid', 'partial', 'paid'
+  paymentMethod     String?   // 'zelle', 'cash', 'paypal', 'check', 'credit_card', 'wire', 'ach'
+  notes             String?
+  createdBy         String?
+  waveVendorId      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  vendor            Vendor    @relation(fields: [vendorId], references: [id])
+  creator           Profile?  @relation("createdBy", fields: [createdBy], references: [id])
+  items             PurchaseOrderItem[]
+  payments          Payment[]
+
+  @@index([businessId, vendorId, status])
+  @@index([poNumber])
+}
+
+model PurchaseOrderItem {
+  id                String    @id @default(cuid())
+  poId              String
+  productId         String
+  quantityOrdered   Decimal   @db.Decimal(10, 2)
+  quantityReceived  Decimal   @db.Decimal(10, 2) @default(0)
+  unitCost          Decimal   @db.Decimal(10, 4)
+  totalCost         Decimal   @db.Decimal(12, 2)
+  notes             String?
+
+  // Relations
+  po                PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id])
+}
+
+// ============ SALES & ORDERS ============
+
+model Order {
+  id                String    @id @default(cuid())
+  businessId        String
+  customerId        String?
+  orderNumber       String    @unique
+  orderType         String    @default("sale") // 'sale', 'transfer', 'return'
+  salesChannel      String?   // 'wholesale_b2b', 'retail_b2c', 'food_service'
+  status            String    @default("pending") // 'pending', 'confirmed', 'processing', 'packed', 'out_for_delivery', 'delivered', 'cancelled'
+  paymentStatus     String    @default("unpaid") // 'unpaid', 'partial', 'paid', 'refunded'
+  paymentMethod     String?
+  deliveryType      String    @default("pickup") // 'pickup', 'delivery'
+  deliveryAddress   Json?
+  deliveryCharge    Decimal   @db.Decimal(10, 2) @default(0)
+  deliveryDate      DateTime?
+  subtotal          Decimal   @db.Decimal(12, 2) @default(0)
+  discountAmount    Decimal   @db.Decimal(12, 2) @default(0)
+  taxAmount         Decimal   @db.Decimal(12, 2) @default(0)
+  totalAmount       Decimal   @db.Decimal(12, 2) @default(0)
+  amountPaid        Decimal   @db.Decimal(12, 2) @default(0)
+  balanceDue        Decimal   @db.Decimal(12, 2) @default(0)
+  waveInvoiceId     String?
+  waveInvoiceUrl    String?
+  paymentTerms      String?   // 'net-30', 'net-60', 'cod'
+  dueDate           DateTime?
+  notes             String?
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer          Customer? @relation(fields: [customerId], references: [id])
+  creator           Profile?  @relation("createdBy", fields: [createdBy], references: [id])
+  items             OrderItem[]
+  payments          Payment[]
+  expenses          Expense[]
+  delivery          Delivery?
+
+  @@index([businessId, customerId, status])
+  @@index([orderNumber, createdAt])
+}
+
+model OrderItem {
+  id                String    @id @default(cuid())
+  orderId           String
+  productId         String
+  batchId           String?
+  sourceBusinessId  String?   // Which store's inventory was used (for transfers)
+  quantity          Decimal   @db.Decimal(10, 2)
+  unitPrice         Decimal   @db.Decimal(10, 4)
+  unitCost          Decimal   @db.Decimal(10, 4)  // COGS at time of sale
+  discountPercent   Decimal   @db.Decimal(5, 2) @default(0)
+  totalPrice        Decimal   @db.Decimal(12, 2)
+  notes             String?
+
+  // Relations
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id])
+  batch             ProductBatch? @relation(fields: [batchId], references: [id])
+}
+
+model Delivery {
+  id                String    @id @default(cuid())
+  orderId           String    @unique
+  deliveryCharge    Decimal   @db.Decimal(10, 2)
+  deliveryCost      Decimal   @db.Decimal(10, 2)  // Actual cost to deliver
+  deliveryType      String    // 'pickup', 'delivery'
+  scheduledDate     DateTime?
+  actualDate        DateTime?
+  carrier           String?
+  trackingNumber    String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  businessId        String
+  orderId           String?
+  poId              String?
+  amount            Decimal   @db.Decimal(12, 2)
+  paymentMethod     String    // 'zelle', 'cash', 'paypal', 'check', 'credit_card', 'wire', 'ach'
+  paymentDate       DateTime
+  referenceNumber   String?   // Check #, transaction ID, etc.
+  direction         String    // 'received', 'sent'
+  notes             String?
+  recordedBy        String?
+  waveTransactionId String?
+  createdAt         DateTime  @default(now())
+
+  // Relations (optional - can be to order or PO)
+  order             Order?    @relation(fields: [orderId], references: [id])
+  po                PurchaseOrder? @relation(fields: [poId], references: [id])
+}
+
+// ============ CUSTOMERS & VENDORS ============
+
+model Customer {
+  id                String    @id @default(cuid())
+  businessId        String
+  userId            String?
+  name              String
+  customerType      String    // 'b2b', 'b2c', 'food_service'
+  email             String?
+  phone             String?
+  address           Json?
+  billingAddress    Json?
+  companyName       String?
+  taxExempt         Boolean   @default(false)
+  creditLimit       Decimal   @db.Decimal(12, 2) @default(0)
+  currentBalance    Decimal   @db.Decimal(12, 2) @default(0)
+  paymentTerms      String?   // 'net-30', 'net-60', 'cod'
+  preferredPayment  String?
+  waveCustomerId    String?
+  notes             String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  orders            Order[]
+
+  @@index([businessId, customerType])
+  @@index([email])
+}
+
+model Vendor {
+  id                String    @id @default(cuid())
+  businessId        String
+  userId            String?
+  name              String
+  contactName       String?
+  email             String?
+  phone             String?
+  address           Json?
+  vendorType        String    // 'wholesale', 'retail', 'distributor'
+  paymentTerms      String?   // 'net30', 'net60', 'cod', 'prepaid'
+  preferredPayment  String?   // 'zelle', 'check', 'ach', 'wire'
+  waveVendorId      String?
+  notes             String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  pos               PurchaseOrder[]
+  priceList         VendorPriceList[]
+  batches           ProductBatch[]
+
+  @@index([businessId, vendorType])
+}
+
+model VendorPriceList {
+  id                String    @id @default(cuid())
+  vendorId          String
+  productId         String
+  price             Decimal   @db.Decimal(10, 4)
+  priceType         String    // 'wholesale', 'retail'
+  unitOfMeasure     String?
+  minimumOrderQty   Decimal   @db.Decimal(10, 2) @default(1)
+  effectiveDate     DateTime
+  expiryDate        DateTime?
+  notes             String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  vendor            Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, productId, priceType, effectiveDate])
+  @@index([vendorId, productId])
+}
+
+// ============ EXPENSES ============
+
+model ExpenseCategory {
+  id                String    @id @default(cuid())
+  name              String
+  parentId          String?
+  waveAccountId     String?   // Maps to Wave chart of accounts
+  description       String?
+  createdAt         DateTime  @default(now())
+
+  // Relations
+  parent            ExpenseCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children          ExpenseCategory[] @relation("CategoryHierarchy")
+  expenses          Expense[]
+
+  @@index([parentId])
+}
+
+model Expense {
+  id                String    @id @default(cuid())
+  businessId        String
+  categoryId        String
+  vendorId          String?
+  orderId           String?   // Optional: allocate to specific order
+  customerId        String?   // Optional: allocate to customer
+  poId              String?   // Optional: allocate to purchase order
+  salesChannel      String?   // 'wholesale_b2b', 'retail_b2c', 'food_service' (for allocation)
+  amount            Decimal   @db.Decimal(12, 2)
+  expenseDate       DateTime
+  description       String
+  paymentMethod     String?
+  referenceNumber   String?
+  receiptId         String?
+  isReimbursable    Boolean   @default(false)
+  waveTransactionId String?
+  submittedBy       String?
+  approvedBy        String?
+  status            String    @default("pending") // 'pending', 'approved', 'rejected'
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category          ExpenseCategory @relation(fields: [categoryId], references: [id])
+  vendor            Vendor?   @relation(fields: [vendorId], references: [id])
+  order             Order?    @relation(fields: [orderId], references: [id])
+  customer          Customer? @relation(fields: [customerId], references: [id])
+  submitter         Profile?  @relation("submittedBy", fields: [submittedBy], references: [id])
+  receipt           Receipt?  @relation(fields: [receiptId], references: [id])
+
+  @@index([businessId, status, expenseDate])
+  @@index([categoryId, expenseDate])
+}
+
+model Receipt {
+  id                String    @id @default(cuid())
+  businessId        String
+  filePath          String    // Supabase Storage path
+  fileName          String
+  fileType          String    // 'image/jpeg', 'image/png', 'application/pdf'
+  fileSize          Int?
+  rawText           String?   // OCR extracted text
+  parsedData        Json?     // AI-parsed structured data
+  parsingStatus     String    @default("pending") // 'pending', 'processing', 'completed', 'failed'
+  parsingConfidence Decimal   @db.Decimal(3, 2)?  // 0.00 to 1.00
+  vendorName        String?   // Extracted from receipt
+  totalAmount       Decimal   @db.Decimal(12, 2)?
+  receiptDate       DateTime?
+  expenseId         String?   // Links to created expense
+  uploadedBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  expenses          Expense[]
+
+  @@index([businessId, parsingStatus])
+  @@index([receiptDate])
+}
+
+// ============ ANALYTICS VIEWS ============
+
+model BatchProfitability {
+  id                String    @id @default(cuid())
+  businessId        String
+  productId         String
+  batchId           String
+  batchNumber       String
+  costOfBatch       Decimal   @db.Decimal(12, 2)  // Total cost = qty * unit_cost
+  totalRevenue      Decimal   @db.Decimal(12, 2)  // Sum of order revenues
+  totalCogs         Decimal   @db.Decimal(12, 2)  // Sum of COGS
+  totalProfit       Decimal   @db.Decimal(12, 2)  // Revenue - COGS
+  roiPercent        Decimal   @db.Decimal(5, 2)   // (Profit / Cost) * 100
+  unitsSold         Decimal   @db.Decimal(10, 2)
+  unitsWasted       Decimal   @db.Decimal(10, 2)
+  status            String    // 'healthy', 'at_risk', 'loss', 'expired'
+  calculatedAt      DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([businessId, batchId])
+  @@index([businessId, roiPercent])
+}
+
+model ProductChannelProfitability {
+  id                String    @id @default(cuid())
+  businessId        String
+  productId         String
+  salesChannel      String    // 'wholesale_b2b', 'retail_b2c', 'food_service'
+  period            String    // 'month', 'quarter', 'year'
+  periodValue       String    // '2026-05', '2026-Q2', '2026'
+  revenue           Decimal   @db.Decimal(12, 2)
+  cogs              Decimal   @db.Decimal(12, 2)
+  grossProfit       Decimal   @db.Decimal(12, 2)
+  grossMarginPercent Decimal  @db.Decimal(5, 2)
+  unitsSold         Decimal   @db.Decimal(10, 2)
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([businessId, productId, salesChannel, periodValue])
+  @@index([businessId, periodValue])
+}
