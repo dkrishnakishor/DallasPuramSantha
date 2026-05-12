@@ -14,10 +14,10 @@ model Business {
   id                String    @id @default(cuid())
   name              String    @unique
   displayName       String
-  businessType      String    // 'b2b', 'b2c', 'mixed'
+  businessType      String
   taxId             String?
   waveBusinessId    String?
-  address           Json?     // {street, city, state, zip, country}
+  address           Json?
   phone             String?
   email             String?
   createdAt         DateTime  @default(now())
@@ -42,7 +42,7 @@ model Profile {
   id                String    @id
   businessId        String
   fullName          String
-  role              String    // 'admin', 'employee', 'vendor', 'customer'
+  role              String
   phone             String?
   avatarUrl         String?
   isActive          Boolean   @default(true)
@@ -64,7 +64,7 @@ model UserBusinessAccess {
   id                String    @id @default(cuid())
   userId            String
   businessId        String
-  roleOverride      String?   // Override profile role for this business
+  roleOverride      String?
   grantedAt         DateTime  @default(now())
   grantedBy         String?
 
@@ -99,7 +99,7 @@ model Product {
   name              String
   description       String?
   categoryId        String?
-  unitOfMeasure     String    // 'lb', 'kg', 'each', 'case', 'dozen'
+  unitOfMeasure     String
   barcode           String?
   imageUrl          String?
   isPerishable      Boolean   @default(false)
@@ -123,7 +123,7 @@ model Product {
 model ProductBatch {
   id                String    @id @default(cuid())
   productId         String
-  batchNumber       String    // Supplier lot number
+  batchNumber       String
   supplierId        String?
   receivedDate      DateTime
   expirationDate    DateTime?
@@ -147,7 +147,7 @@ model Inventory {
   businessId        String
   quantityOnHand    Decimal   @db.Decimal(10, 2) @default(0)
   quantityReserved  Decimal   @db.Decimal(10, 2) @default(0)
-  costPerUnit       Decimal   @db.Decimal(10, 4)  // Weighted average
+  costPerUnit       Decimal   @db.Decimal(10, 4)
   retailPrice       Decimal   @db.Decimal(10, 2)
   wholesalePrice    Decimal   @db.Decimal(10, 2)?
   lastRestockedAt   DateTime?
@@ -186,11 +186,11 @@ model InventoryTransaction {
   productId         String
   businessId        String
   batchId           String?
-  transactionType   String    // 'purchase', 'sale', 'transfer_in', 'transfer_out', 'adjustment', 'return'
+  transactionType   String
   quantity          Decimal   @db.Decimal(10, 2)
   unitCost          Decimal   @db.Decimal(10, 4)?
-  referenceId       String?   // FK to PO, Order, or Transfer
-  referenceType     String?   // 'purchase_order', 'order', 'transfer'
+  referenceId       String?
+  referenceType     String?
   notes             String?
   performedBy       String?
   createdAt         DateTime  @default(now())
@@ -210,7 +210,7 @@ model InventoryTransfer {
   productId         String
   quantity          Decimal   @db.Decimal(10, 2)
   transferCost      Decimal   @db.Decimal(10, 2) @default(0)
-  status            String    @default("pending") // 'pending', 'in_transit', 'completed', 'cancelled'
+  status            String    @default("pending")
   requestedBy       String?
   approvedBy        String?
   notes             String?
@@ -226,7 +226,7 @@ model PurchaseOrder {
   businessId        String
   vendorId          String
   poNumber          String    @unique
-  status            String    @default("draft") // 'draft', 'sent', 'received', 'partial', 'cancelled'
+  status            String    @default("draft")
   orderDate         DateTime  @default(now())
   expectedDate      DateTime?
   receivedDate      DateTime?
@@ -234,8 +234,8 @@ model PurchaseOrder {
   taxAmount         Decimal   @db.Decimal(12, 2) @default(0)
   shippingAmount    Decimal   @db.Decimal(12, 2) @default(0)
   totalAmount       Decimal   @db.Decimal(12, 2) @default(0)
-  paymentStatus     String    @default("unpaid") // 'unpaid', 'partial', 'paid'
-  paymentMethod     String?   // 'zelle', 'cash', 'paypal', 'check', 'credit_card', 'wire', 'ach'
+  paymentStatus     String    @default("unpaid")
+  paymentMethod     String?
   notes             String?
   createdBy         String?
   waveVendorId      String?
@@ -275,12 +275,12 @@ model Order {
   businessId        String
   customerId        String?
   orderNumber       String    @unique
-  orderType         String    @default("sale") // 'sale', 'transfer', 'return'
-  salesChannel      String?   // 'wholesale_b2b', 'retail_b2c', 'food_service'
-  status            String    @default("pending") // 'pending', 'confirmed', 'processing', 'packed', 'out_for_delivery', 'delivered', 'cancelled'
-  paymentStatus     String    @default("unpaid") // 'unpaid', 'partial', 'paid', 'refunded'
+  orderType         String    @default("sale")
+  salesChannel      String?
+  status            String    @default("pending")
+  paymentStatus     String    @default("unpaid")
   paymentMethod     String?
-  deliveryType      String    @default("pickup") // 'pickup', 'delivery'
+  deliveryType      String    @default("pickup")
   deliveryAddress   Json?
   deliveryCharge    Decimal   @db.Decimal(10, 2) @default(0)
   deliveryDate      DateTime?
@@ -292,7 +292,7 @@ model Order {
   balanceDue        Decimal   @db.Decimal(12, 2) @default(0)
   waveInvoiceId     String?
   waveInvoiceUrl    String?
-  paymentTerms      String?   // 'net-30', 'net-60', 'cod'
+  paymentTerms      String?
   dueDate           DateTime?
   notes             String?
   createdBy         String?
@@ -317,10 +317,10 @@ model OrderItem {
   orderId           String
   productId         String
   batchId           String?
-  sourceBusinessId  String?   // Which store's inventory was used (for transfers)
+  sourceBusinessId  String?
   quantity          Decimal   @db.Decimal(10, 2)
   unitPrice         Decimal   @db.Decimal(10, 4)
-  unitCost          Decimal   @db.Decimal(10, 4)  // COGS at time of sale
+  unitCost          Decimal   @db.Decimal(10, 4)
   discountPercent   Decimal   @db.Decimal(5, 2) @default(0)
   totalPrice        Decimal   @db.Decimal(12, 2)
   notes             String?
@@ -335,8 +335,8 @@ model Delivery {
   id                String    @id @default(cuid())
   orderId           String    @unique
   deliveryCharge    Decimal   @db.Decimal(10, 2)
-  deliveryCost      Decimal   @db.Decimal(10, 2)  // Actual cost to deliver
-  deliveryType      String    // 'pickup', 'delivery'
+  deliveryCost      Decimal   @db.Decimal(10, 2)
+  deliveryType      String
   scheduledDate     DateTime?
   actualDate        DateTime?
   carrier           String?
@@ -353,10 +353,10 @@ model Payment {
   orderId           String?
   poId              String?
   amount            Decimal   @db.Decimal(12, 2)
-  paymentMethod     String    // 'zelle', 'cash', 'paypal', 'check', 'credit_card', 'wire', 'ach'
+  paymentMethod     String
   paymentDate       DateTime
-  referenceNumber   String?   // Check #, transaction ID, etc.
-  direction         String    // 'received', 'sent'
+  referenceNumber   String?
+  direction         String
   notes             String?
   recordedBy        String?
   waveTransactionId String?
@@ -374,7 +374,7 @@ model Customer {
   businessId        String
   userId            String?
   name              String
-  customerType      String    // 'b2b', 'b2c', 'food_service'
+  customerType      String
   email             String?
   phone             String?
   address           Json?
@@ -383,7 +383,7 @@ model Customer {
   taxExempt         Boolean   @default(false)
   creditLimit       Decimal   @db.Decimal(12, 2) @default(0)
   currentBalance    Decimal   @db.Decimal(12, 2) @default(0)
-  paymentTerms      String?   // 'net-30', 'net-60', 'cod'
+  paymentTerms      String?
   preferredPayment  String?
   waveCustomerId    String?
   notes             String?
@@ -408,9 +408,9 @@ model Vendor {
   email             String?
   phone             String?
   address           Json?
-  vendorType        String    // 'wholesale', 'retail', 'distributor'
-  paymentTerms      String?   // 'net30', 'net60', 'cod', 'prepaid'
-  preferredPayment  String?   // 'zelle', 'check', 'ach', 'wire'
+  vendorType        String
+  paymentTerms      String?
+  preferredPayment  String?
   waveVendorId      String?
   notes             String?
   isActive          Boolean   @default(true)
@@ -431,7 +431,7 @@ model VendorPriceList {
   vendorId          String
   productId         String
   price             Decimal   @db.Decimal(10, 4)
-  priceType         String    // 'wholesale', 'retail'
+  priceType         String
   unitOfMeasure     String?
   minimumOrderQty   Decimal   @db.Decimal(10, 2) @default(1)
   effectiveDate     DateTime
@@ -453,7 +453,7 @@ model ExpenseCategory {
   id                String    @id @default(cuid())
   name              String
   parentId          String?
-  waveAccountId     String?   // Maps to Wave chart of accounts
+  waveAccountId     String?
   description       String?
   createdAt         DateTime  @default(now())
 
@@ -470,10 +470,10 @@ model Expense {
   businessId        String
   categoryId        String
   vendorId          String?
-  orderId           String?   // Optional: allocate to specific order
-  customerId        String?   // Optional: allocate to customer
-  poId              String?   // Optional: allocate to purchase order
-  salesChannel      String?   // 'wholesale_b2b', 'retail_b2c', 'food_service' (for allocation)
+  orderId           String?
+  customerId        String?
+  poId              String?
+  salesChannel      String?
   amount            Decimal   @db.Decimal(12, 2)
   expenseDate       DateTime
   description       String
@@ -484,7 +484,7 @@ model Expense {
   waveTransactionId String?
   submittedBy       String?
   approvedBy        String?
-  status            String    @default("pending") // 'pending', 'approved', 'rejected'
+  status            String    @default("pending")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -504,18 +504,18 @@ model Expense {
 model Receipt {
   id                String    @id @default(cuid())
   businessId        String
-  filePath          String    // Supabase Storage path
+  filePath          String
   fileName          String
-  fileType          String    // 'image/jpeg', 'image/png', 'application/pdf'
+  fileType          String
   fileSize          Int?
-  rawText           String?   // OCR extracted text
-  parsedData        Json?     // AI-parsed structured data
-  parsingStatus     String    @default("pending") // 'pending', 'processing', 'completed', 'failed'
-  parsingConfidence Decimal   @db.Decimal(3, 2)?  // 0.00 to 1.00
-  vendorName        String?   // Extracted from receipt
+  rawText           String?
+  parsedData        Json?
+  parsingStatus     String    @default("pending")
+  parsingConfidence Decimal   @db.Decimal(3, 2)?
+  vendorName        String?
   totalAmount       Decimal   @db.Decimal(12, 2)?
   receiptDate       DateTime?
-  expenseId         String?   // Links to created expense
+  expenseId         String?
   uploadedBy        String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -536,14 +536,14 @@ model BatchProfitability {
   productId         String
   batchId           String
   batchNumber       String
-  costOfBatch       Decimal   @db.Decimal(12, 2)  // Total cost = qty * unit_cost
-  totalRevenue      Decimal   @db.Decimal(12, 2)  // Sum of order revenues
-  totalCogs         Decimal   @db.Decimal(12, 2)  // Sum of COGS
-  totalProfit       Decimal   @db.Decimal(12, 2)  // Revenue - COGS
-  roiPercent        Decimal   @db.Decimal(5, 2)   // (Profit / Cost) * 100
+  costOfBatch       Decimal   @db.Decimal(12, 2)
+  totalRevenue      Decimal   @db.Decimal(12, 2)
+  totalCogs         Decimal   @db.Decimal(12, 2)
+  totalProfit       Decimal   @db.Decimal(12, 2)
+  roiPercent        Decimal   @db.Decimal(5, 2)
   unitsSold         Decimal   @db.Decimal(10, 2)
   unitsWasted       Decimal   @db.Decimal(10, 2)
-  status            String    // 'healthy', 'at_risk', 'loss', 'expired'
+  status            String
   calculatedAt      DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -555,9 +555,9 @@ model ProductChannelProfitability {
   id                String    @id @default(cuid())
   businessId        String
   productId         String
-  salesChannel      String    // 'wholesale_b2b', 'retail_b2c', 'food_service'
-  period            String    // 'month', 'quarter', 'year'
-  periodValue       String    // '2026-05', '2026-Q2', '2026'
+  salesChannel      String
+  period            String
+  periodValue       String
   revenue           Decimal   @db.Decimal(12, 2)
   cogs              Decimal   @db.Decimal(12, 2)
   grossProfit       Decimal   @db.Decimal(12, 2)
