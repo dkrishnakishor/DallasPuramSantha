@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 // ============ CORE ENTITIES ============
@@ -112,6 +112,7 @@ model Product {
   category          ProductCategory? @relation(fields: [categoryId], references: [id])
   inventory         Inventory[]
   inventoryBatches  InventoryBatch[]
+  inventoryTransactions InventoryTransaction[]
   productBatches    ProductBatch[]
   orderItems        OrderItem[]
   poItems           PurchaseOrderItem[]
@@ -394,6 +395,7 @@ model Customer {
   // Relations
   business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   orders            Order[]
+  expenses          Expense[]
 
   @@index([businessId, customerType])
   @@index([email])
@@ -422,6 +424,7 @@ model Vendor {
   pos               PurchaseOrder[]
   priceList         VendorPriceList[]
   batches           ProductBatch[]
+  expenses          Expense[]
 
   @@index([businessId, vendorType])
 }
