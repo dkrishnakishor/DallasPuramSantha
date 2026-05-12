@@ -149,7 +149,7 @@ model Inventory {
   quantityReserved  Decimal   @db.Decimal(10, 2) @default(0)
   costPerUnit       Decimal   @db.Decimal(10, 4)
   retailPrice       Decimal   @db.Decimal(10, 2)
-  wholesalePrice    Decimal   @db.Decimal(10, 2)?
+  wholesalePrice    Decimal?  @db.Decimal(10, 2)
   lastRestockedAt   DateTime?
   updatedAt         DateTime  @updatedAt
 
@@ -188,7 +188,7 @@ model InventoryTransaction {
   batchId           String?
   transactionType   String
   quantity          Decimal   @db.Decimal(10, 2)
-  unitCost          Decimal   @db.Decimal(10, 4)?
+  unitCost          Decimal?  @db.Decimal(10, 4)
   referenceId       String?
   referenceType     String?
   notes             String?
@@ -511,9 +511,9 @@ model Receipt {
   rawText           String?
   parsedData        Json?
   parsingStatus     String    @default("pending")
-  parsingConfidence Decimal   @db.Decimal(3, 2)?
+  parsingConfidence Decimal?  @db.Decimal(3, 2)
   vendorName        String?
-  totalAmount       Decimal   @db.Decimal(12, 2)?
+  totalAmount       Decimal?  @db.Decimal(12, 2)
   receiptDate       DateTime?
   expenseId         String?
   uploadedBy        String?
