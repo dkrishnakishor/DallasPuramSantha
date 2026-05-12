@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(grep -n \"Decimal.*@db.Decimal.*?\" d:\\\\\\\\Claude\\\\\\\\DallasPuramSantha\\\\\\\\prisma\\\\\\\\schema.prisma)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\architecture-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\security-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\performance-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\code-quality-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills"
+    ]
+  }
+}

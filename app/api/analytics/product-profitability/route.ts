@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import {
+  getAuthenticatedUser,
+  checkBusinessAccess,
+  unauthorizedResponse,
+  forbiddenResponse,
+  badRequestResponse,
+  internalErrorResponse,
+} from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -8,6 +16,9 @@ const prisma = new PrismaClient();
  *
  * Returns product-level profitability analysis by sales channel
  * Used by: Profitability Analyst skill
+ *
+ * Headers:
+ *   - Authorization: Bearer <token> (required)
  *
  * Query parameters:
  *   - business_id: UUID (required)
@@ -18,16 +29,26 @@ const prisma = new PrismaClient();
  */
 export async function GET(request: NextRequest) {
   try {
+    // Step 1: Authenticate user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
+    // Step 2: Get business_id parameter
     const businessId = request.nextUrl.searchParams.get('business_id');
+    if (!businessId) {
+      return badRequestResponse('business_id parameter required');
+    }
+
+    // Step 3: Authorize access to business
+    const hasAccess = await checkBusinessAccess(user.id, businessId);
+    if (!hasAccess) {
+      return forbiddenResponse();
+    }
+
     const channel = request.nextUrl.searchParams.get('channel') || 'all';
     const period = request.nextUrl.searchParams.get('period') || 'month';
-
-    if (!businessId) {
-      return NextResponse.json(
-        { error: 'business_id parameter required' },
-        { status: 400 }
-      );
-    }
 
     // Calculate date range based on period
     const now = new Date();
@@ -142,10 +163,6 @@ export async function GET(request: NextRequest) {
       bottom_performers: filtered.slice(-5),
     });
   } catch (error) {
-    console.error('Error fetching product profitability:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return internalErrorResponse(error);
   }
 }

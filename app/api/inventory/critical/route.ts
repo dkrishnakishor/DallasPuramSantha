@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import {
+  getAuthenticatedUser,
+  checkBusinessAccess,
+  unauthorizedResponse,
+  forbiddenResponse,
+  badRequestResponse,
+  internalErrorResponse,
+} from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -9,6 +17,9 @@ const prisma = new PrismaClient();
  * Returns products at risk of stockout or low inventory
  * Used by: Transfer Optimizer skill
  *
+ * Headers:
+ *   - Authorization: Bearer <token> (required)
+ *
  * Query parameters:
  *   - business_id: UUID (required)
  *   - severity: 'critical' | 'low' | 'all' (optional, default: 'all')
@@ -17,17 +28,51 @@ const prisma = new PrismaClient();
  */
 export async function GET(request: NextRequest) {
   try {
-    const businessId = request.nextUrl.searchParams.get('business_id');
-    const severity = request.nextUrl.searchParams.get('severity') || 'all';
-
-    if (!businessId) {
-      return NextResponse.json(
-        { error: 'business_id parameter required' },
-        { status: 400 }
-      );
+    // Step 1: Authenticate user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
     }
 
+    // Step 2: Get business_id parameter
+    const businessId = request.nextUrl.searchParams.get('business_id');
+    if (!businessId) {
+      return badRequestResponse('business_id parameter required');
+    }
+
+    // Step 3: Authorize access to business
+    const hasAccess = await checkBusinessAccess(user.id, businessId);
+    if (!hasAccess) {
+      return forbiddenResponse();
+    }
+
+    const severity = request.nextUrl.searchParams.get('severity') || 'all';
+
     // Get all inventory for this business
+    const last30Days = new Date();
+    last30Days.setDate(last30Days.getDate() - 30);
+
+    // Optimize: Fetch all sales data in one query with aggregation
+    const salesByProduct = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        order: {
+          businessId: businessId,
+          createdAt: {
+            gte: last30Days,
+          },
+        },
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    // Create lookup map for quick access
+    const salesMap = new Map(
+      salesByProduct.map((s) => [s.productId, Number(s._sum.quantity) || 0])
+    );
+
     const inventory = await prisma.inventory.findMany({
       where: {
         businessId: businessId,
@@ -41,24 +86,9 @@ export async function GET(request: NextRequest) {
     const critical = [];
 
     for (const inv of inventory) {
-      // Get average daily sales
-      const last30Days = new Date();
-      last30Days.setDate(last30Days.getDate() - 30);
+      const totalSalesLast30 = salesMap.get(inv.productId) || 0;
 
-      const salesLast30 = await prisma.orderItem.findMany({
-        where: {
-          productId: inv.productId,
-          order: {
-            businessId: businessId,
-            createdAt: {
-              gte: last30Days,
-            },
-          },
-        },
-      });
-
-      const avgDailySales =
-        salesLast30.reduce((sum, item) => sum + Number(item.quantity), 0) / 30;
+      const avgDailySales = totalSalesLast30 / 30;
       const daysSupply = avgDailySales > 0 ? Number(inv.quantityOnHand) / avgDailySales : 999;
 
       // Determine severity
@@ -115,10 +145,6 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error fetching critical inventory:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return internalErrorResponse(error);
   }
 }
