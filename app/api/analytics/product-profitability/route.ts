@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import {
+  getAuthenticatedUser,
+  checkBusinessAccess,
+  unauthorizedResponse,
+  forbiddenResponse,
+  badRequestResponse,
+  internalErrorResponse,
+} from '@/lib/auth';
+import { generateCacheKey, getCachedData, setCachedData } from '@/lib/cache';
 
 const prisma = new PrismaClient();
 
@@ -8,6 +17,9 @@ const prisma = new PrismaClient();
  *
  * Returns product-level profitability analysis by sales channel
  * Used by: Profitability Analyst skill
+ *
+ * Headers:
+ *   - Authorization: Bearer <token> (required)
  *
  * Query parameters:
  *   - business_id: UUID (required)
@@ -18,15 +30,32 @@ const prisma = new PrismaClient();
  */
 export async function GET(request: NextRequest) {
   try {
+    // Step 1: Authenticate user
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return unauthorizedResponse();
+    }
+
+    // Step 2: Get business_id parameter
     const businessId = request.nextUrl.searchParams.get('business_id');
+    if (!businessId) {
+      return badRequestResponse('business_id parameter required');
+    }
+
+    // Step 3: Authorize access to business
+    const hasAccess = await checkBusinessAccess(user.id, businessId);
+    if (!hasAccess) {
+      return forbiddenResponse();
+    }
+
     const channel = request.nextUrl.searchParams.get('channel') || 'all';
     const period = request.nextUrl.searchParams.get('period') || 'month';
 
-    if (!businessId) {
-      return NextResponse.json(
-        { error: 'business_id parameter required' },
-        { status: 400 }
-      );
+    // Step 4: Check cache
+    const cacheKey = generateCacheKey('product-profitability', businessId, { channel, period });
+    const cachedResult = await getCachedData(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
     }
 
     // Calculate date range based on period
@@ -130,7 +159,7 @@ export async function GET(request: NextRequest) {
       total_units_sold: filtered.reduce((sum, r) => sum + r.units_sold, 0),
     };
 
-    return NextResponse.json({
+    const response = {
       business_id: businessId,
       period: period,
       channel_filter: channel,
@@ -140,12 +169,13 @@ export async function GET(request: NextRequest) {
       summary: summary,
       top_performers: filtered.slice(0, 5),
       bottom_performers: filtered.slice(-5),
-    });
+    };
+
+    // Cache the response for 1 hour
+    await setCachedData(cacheKey, response, { ttl: 3600 });
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching product profitability:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return internalErrorResponse(error);
   }
 }

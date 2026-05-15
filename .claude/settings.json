@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git commit *)",
+      "Bash(grep -n \"Decimal.*@db.Decimal.*?\" d:\\\\\\\\Claude\\\\\\\\DallasPuramSantha\\\\\\\\prisma\\\\\\\\schema.prisma)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000/\" -Method GET -ErrorAction SilentlyContinue)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx prisma *)",
+      "Bash(curl -s https://api.github.com/repos/dkrishnakishor/DallasPuramSantha/deployments?environment=Preview)",
+      "Bash(curl -s https://api.github.com/repos/dkrishnakishor/DallasPuramSantha/deployments/4697005630/statuses)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\architecture-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\security-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\performance-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\code-quality-review",
+      "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills"
+    ]
+  }
+}
