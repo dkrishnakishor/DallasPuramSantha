@@ -8,6 +8,7 @@ import {
   badRequestResponse,
   internalErrorResponse,
 } from '@/lib/auth';
+import { generateCacheKey, getCachedData, setCachedData } from '@/lib/cache';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +50,13 @@ export async function GET(request: NextRequest) {
     }
 
     const statusFilter = request.nextUrl.searchParams.get('status_filter') || 'all';
+
+    // Step 4: Check cache
+    const cacheKey = generateCacheKey('batch-profitability', businessId, { statusFilter });
+    const cachedResult = await getCachedData(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
 
     // Get all batches for this business with order data
     // Optimize: Fetch all orders in one query instead of N+1
@@ -125,7 +133,7 @@ export async function GET(request: NextRequest) {
     // Sort by ROI descending
     filtered.sort((a, b) => b.roi_percent - a.roi_percent);
 
-    return NextResponse.json({
+    const response = {
       business_id: businessId,
       total_batches: filtered.length,
       batches: filtered,
@@ -139,7 +147,12 @@ export async function GET(request: NextRequest) {
           ) / 100,
         unhealthy_batches: filtered.filter((b) => b.status !== 'healthy').length,
       },
-    });
+    };
+
+    // Cache the response for 1 hour
+    await setCachedData(cacheKey, response, { ttl: 3600 });
+
+    return NextResponse.json(response);
   } catch (error) {
     return internalErrorResponse(error);
   }

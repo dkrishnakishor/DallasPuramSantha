@@ -8,6 +8,7 @@ import {
   badRequestResponse,
   internalErrorResponse,
 } from '@/lib/auth';
+import { generateCacheKey, getCachedData, setCachedData } from '@/lib/cache';
 
 const prisma = new PrismaClient();
 
@@ -47,6 +48,13 @@ export async function GET(request: NextRequest) {
     }
 
     const severity = request.nextUrl.searchParams.get('severity') || 'all';
+
+    // Step 4: Check cache
+    const cacheKey = generateCacheKey('inventory-critical', businessId, { severity });
+    const cachedResult = await getCachedData(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
 
     // Get all inventory for this business
     const last30Days = new Date();
@@ -128,7 +136,7 @@ export async function GET(request: NextRequest) {
     // Sort by days_supply ascending (most critical first)
     filtered.sort((a, b) => a.days_supply - b.days_supply);
 
-    return NextResponse.json({
+    const response = {
       business_id: businessId,
       severity_filter: severity,
       total_at_risk: filtered.length,
@@ -143,7 +151,12 @@ export async function GET(request: NextRequest) {
             : 'Reorder from vendor to prevent stockout',
         urgency: p.status === 'critical' ? 'HIGH' : 'MEDIUM',
       })),
-    });
+    };
+
+    // Cache the response for 30 minutes (inventory changes more frequently)
+    await setCachedData(cacheKey, response, { ttl: 1800 });
+
+    return NextResponse.json(response);
   } catch (error) {
     return internalErrorResponse(error);
   }

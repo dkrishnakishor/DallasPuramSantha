@@ -3,7 +3,10 @@
     "allow": [
       "Bash(git push *)",
       "Bash(git commit *)",
-      "Bash(grep -n \"Decimal.*@db.Decimal.*?\" d:\\\\\\\\Claude\\\\\\\\DallasPuramSantha\\\\\\\\prisma\\\\\\\\schema.prisma)"
+      "Bash(grep -n \"Decimal.*@db.Decimal.*?\" d:\\\\\\\\Claude\\\\\\\\DallasPuramSantha\\\\\\\\prisma\\\\\\\\schema.prisma)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:3000/\" -Method GET -ErrorAction SilentlyContinue)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot"
     ],
     "additionalDirectories": [
       "C:\\Users\\dkris\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\unknown\\skills\\architecture-review",

@@ -8,6 +8,7 @@ import {
   badRequestResponse,
   internalErrorResponse,
 } from '@/lib/auth';
+import { generateCacheKey, getCachedData, setCachedData } from '@/lib/cache';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +50,13 @@ export async function GET(request: NextRequest) {
 
     const channel = request.nextUrl.searchParams.get('channel') || 'all';
     const period = request.nextUrl.searchParams.get('period') || 'month';
+
+    // Step 4: Check cache
+    const cacheKey = generateCacheKey('product-profitability', businessId, { channel, period });
+    const cachedResult = await getCachedData(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
 
     // Calculate date range based on period
     const now = new Date();
@@ -151,7 +159,7 @@ export async function GET(request: NextRequest) {
       total_units_sold: filtered.reduce((sum, r) => sum + r.units_sold, 0),
     };
 
-    return NextResponse.json({
+    const response = {
       business_id: businessId,
       period: period,
       channel_filter: channel,
@@ -161,7 +169,12 @@ export async function GET(request: NextRequest) {
       summary: summary,
       top_performers: filtered.slice(0, 5),
       bottom_performers: filtered.slice(-5),
-    });
+    };
+
+    // Cache the response for 1 hour
+    await setCachedData(cacheKey, response, { ttl: 3600 });
+
+    return NextResponse.json(response);
   } catch (error) {
     return internalErrorResponse(error);
   }

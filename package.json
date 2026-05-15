@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",
+    "@sentry/nextjs": "^8.0.0",
     "@supabase/supabase-js": "^2.105.4",
+    "@upstash/redis": "^1.34.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
