@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -18,8 +18,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const organization = await prisma.business.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -67,7 +68,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -75,12 +76,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const { displayName, businessType, email, phone, address } = body;
 
     // Verify organization exists
     const existing = await prisma.business.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -92,7 +94,7 @@ export async function PUT(
 
     // Update organization
     const organization = await prisma.business.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(displayName && { displayName }),
         ...(businessType && { businessType }),
@@ -133,7 +135,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -141,9 +143,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     // Verify organization exists
     const organization = await prisma.business.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         displayName: true,
@@ -189,7 +193,7 @@ export async function DELETE(
 
     // Delete organization (CASCADE will handle related data)
     await prisma.business.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({

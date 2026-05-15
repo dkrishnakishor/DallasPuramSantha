@@ -95,43 +95,43 @@ export default function TransfersReportPage() {
     if (!reportData) return;
 
     const csvContent = [
-      ['Transfer Report', new Date().toLocaleDateString()].join(' - '),
-      '',
+      ['Transfer Report', new Date().toLocaleDateString()],
+      [],
       ['Summary Metrics'],
-      ['Total Transfers', reportData.summary.totalTransfers],
-      ['Total Quantity', reportData.summary.totalQuantity],
+      ['Total Transfers', reportData.summary.totalTransfers.toString()],
+      ['Total Quantity', reportData.summary.totalQuantity.toString()],
       ['Total Margin', `$${reportData.summary.totalMargin.toFixed(2)}`],
       ['Margin Percent', `${reportData.summary.marginPercent.toFixed(2)}%`],
-      '',
+      [],
       ['Business Pair Analysis'],
       ['From', 'To', 'Count', 'Quantity', 'Total Margin', 'Avg Margin %'],
       ...reportData.businessPairs.map((pair) => [
         pair.fromBusiness,
         pair.toBusiness,
-        pair.transferCount,
-        pair.quantity,
+        pair.transferCount.toString(),
+        pair.quantity.toString(),
         pair.totalMargin.toFixed(2),
         pair.avgMarginPercent.toFixed(2),
       ]),
-      '',
+      [],
       ['Product Analysis'],
       ['Product', 'SKU', 'Count', 'Quantity', 'Total Margin', 'Avg Markup %'],
       ...reportData.products.map((prod) => [
         prod.productName,
         prod.sku,
-        prod.transferCount,
-        prod.quantity,
+        prod.transferCount.toString(),
+        prod.quantity.toString(),
         prod.totalMargin.toFixed(2),
         prod.avgMarkupPercent.toFixed(2),
       ]),
-      '',
+      [],
       ['Transfer Details'],
       ['From', 'To', 'Product', 'Quantity', 'Cost/Unit', 'Transfer Price', 'Markup', 'Margin', 'Status', 'Date'],
       ...reportData.transfers.map((t) => [
         t.fromBusiness,
         t.toBusiness,
         t.productName,
-        t.quantity,
+        t.quantity.toString(),
         t.costPerUnit.toFixed(2),
         t.transferPrice.toFixed(2),
         `${t.markup}${t.markupType === 'PERCENTAGE' ? '%' : '$'}`,
@@ -140,7 +140,7 @@ export default function TransfersReportPage() {
         new Date(t.transferedAt).toLocaleDateString(),
       ]),
     ]
-      .map((row) => row.join(','))
+      .map((row) => (Array.isArray(row) ? row.join(',') : ''))
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });

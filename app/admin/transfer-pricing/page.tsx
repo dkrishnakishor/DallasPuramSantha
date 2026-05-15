@@ -250,8 +250,8 @@ export default function TransferPricingPage() {
             setShowEditModal(false);
             setSelectedRule(null);
           }}
-          onSave={() => {
-            fetchRules();
+          onSave={async () => {
+            await fetchRules();
             setShowEditModal(false);
             setSelectedRule(null);
           }}

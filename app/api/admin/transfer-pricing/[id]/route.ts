@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -18,13 +18,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const rule = await prisma.interOrgTransferRule.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         fromBusiness: { select: { id: true, displayName: true } },
         toBusiness: { select: { id: true, displayName: true } },
         product: { select: { id: true, name: true, sku: true } },
-        transfers: { select: { _count: true } },
       },
     });
 
@@ -54,7 +55,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -62,6 +63,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const {
       markupType,
@@ -74,7 +76,7 @@ export async function PUT(
 
     // Verify rule exists
     const existing = await prisma.interOrgTransferRule.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -86,7 +88,7 @@ export async function PUT(
 
     // Update rule
     const rule = await prisma.interOrgTransferRule.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(markupType && { markupType }),
         ...(markupValue !== undefined && {
@@ -126,7 +128,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
@@ -134,9 +136,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
+
     // Verify rule exists
     const existing = await prisma.interOrgTransferRule.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -148,7 +152,7 @@ export async function DELETE(
 
     // Delete rule
     await prisma.interOrgTransferRule.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({
