@@ -2,19 +2,17 @@ import * as Sentry from '@sentry/nextjs';
 
 // Initialize Sentry for error tracking and performance monitoring
 export function initializeMonitoring() {
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
-    environment: process.env.NODE_ENV || 'development',
-    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-    integrations: [
-      new Sentry.Integrations.OnUncaughtException(),
-      new Sentry.Integrations.OnUnhandledRejection(),
-    ],
-    beforeSend(event) {
-      // Filter out specific errors if needed
-      return event;
-    },
-  });
+  if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    Sentry.init({
+      dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+      beforeSend(event) {
+        // Filter out specific errors if needed
+        return event;
+      },
+    });
+  }
 }
 
 // Performance monitoring metrics
@@ -33,21 +31,11 @@ export interface PerformanceMetrics {
  * Log performance metrics to Sentry
  */
 export function logMetrics(metrics: PerformanceMetrics) {
-  const transaction = Sentry.startTransaction({
-    op: 'http.request',
-    name: `${metrics.method} ${metrics.endpoint}`,
-    data: {
-      'http.method': metrics.method,
-      'http.status_code': metrics.statusCode,
-      'cache.hit': metrics.cacheHit,
-      'user.id': metrics.userId,
-      'business.id': metrics.businessId,
-    },
-  });
-
-  // Finish immediately (duration already measured)
-  transaction.setEndTimestamp(Date.now() / 1000 - metrics.duration / 1000);
-  transaction.finish();
+  // Capture as breadcrumb for performance tracking
+  Sentry.captureMessage(
+    `${metrics.method} ${metrics.endpoint} - ${metrics.duration}ms`,
+    'info'
+  );
 
   // Log to console in dev
   if (process.env.NODE_ENV === 'development') {
