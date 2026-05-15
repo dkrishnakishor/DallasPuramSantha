@@ -35,6 +35,12 @@ model Business {
   expenses          Expense[]
   receipts          Receipt[]
 
+  // Inter-org transfers
+  transferRulesFrom InterOrgTransferRule[] @relation("InterOrgFrom")
+  transferRulesTo   InterOrgTransferRule[] @relation("InterOrgTo")
+  transfersOut      InterOrgTransfer[] @relation("TransferFrom")
+  transfersIn       InterOrgTransfer[] @relation("TransferTo")
+
   @@index([name])
 }
 
@@ -117,6 +123,8 @@ model Product {
   orderItems        OrderItem[]
   poItems           PurchaseOrderItem[]
   vendorPrices      VendorPriceList[]
+  transferRules     InterOrgTransferRule[]
+  transfers         InterOrgTransfer[]
 
   @@index([categoryId, sku])
 }
@@ -570,4 +578,75 @@ model ProductChannelProfitability {
 
   @@unique([businessId, productId, salesChannel, periodValue])
   @@index([businessId, periodValue])
+}
+
+// ============ INTER-ORGANIZATION TRANSFERS ============
+
+model InterOrgTransferRule {
+  id                String    @id @default(cuid())
+  fromBusinessId    String
+  toBusinessId      String
+  productId         String?   // null = applies to all products
+
+  // Pricing strategy
+  markupType        String    @default("PERCENTAGE") // PERCENTAGE or FIXED_AMOUNT
+  markupValue       Decimal   @db.Decimal(10, 2)     // e.g., 20 for 20%, or 50 for $50
+
+  minMargin         Decimal?  @db.Decimal(10, 2)     // Minimum profit required
+  notes             String?
+
+  effectiveFrom     DateTime  @default(now())
+  effectiveTo       DateTime?
+  active            Boolean   @default(true)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  fromBusiness      Business  @relation("InterOrgFrom", fields: [fromBusinessId], references: [id], onDelete: Cascade)
+  toBusiness        Business  @relation("InterOrgTo", fields: [toBusinessId], references: [id], onDelete: Cascade)
+  product           Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  transfers         InterOrgTransfer[]
+
+  @@unique([fromBusinessId, toBusinessId, productId, effectiveFrom])
+  @@index([fromBusinessId])
+  @@index([toBusinessId])
+  @@index([active])
+}
+
+model InterOrgTransfer {
+  id                String    @id @default(cuid())
+  ruleId            String?
+  fromBusinessId    String
+  toBusinessId      String
+
+  productId         String
+  quantity          Decimal   @db.Decimal(10, 2)
+
+  // Pricing
+  costPerUnit       Decimal   @db.Decimal(12, 2)     // Cost at source
+  transferPrice     Decimal   @db.Decimal(12, 2)     // Price between orgs
+  salePrice         Decimal?  @db.Decimal(12, 2)     // Final retail price (if known)
+
+  markup            Decimal   @db.Decimal(10, 2)     // Actual markup applied ($ or %)
+  markupType        String    @default("PERCENTAGE")
+  margin            Decimal   @db.Decimal(12, 2)     // Total profit = (transferPrice - costPerUnit) * quantity
+
+  status            String    @default("completed")  // pending, completed, returned
+  notes             String?
+
+  transferedAt      DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  rule              InterOrgTransferRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  fromBusiness      Business  @relation("TransferFrom", fields: [fromBusinessId], references: [id], onDelete: Cascade)
+  toBusiness        Business  @relation("TransferTo", fields: [toBusinessId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([fromBusinessId, transferedAt])
+  @@index([toBusinessId, transferedAt])
+  @@index([status])
+  @@index([transferedAt])
 }
